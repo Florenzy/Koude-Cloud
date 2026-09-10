@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: koude
+      POSTGRES_DB: koude
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U koude -d koude"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    image: ${KOUDE_IMAGE:-koude-cloud:local}
+    build: .
+    command: ["node", "scripts/migrate.mjs"]
+    environment:
+      DATABASE_URL: postgresql://koude:${POSTGRES_PASSWORD}@db:5432/koude
+    depends_on:
+      db:
+        condition: service_healthy
+  app:
+    image: ${KOUDE_IMAGE:-koude-cloud:local}
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://koude:${POSTGRES_PASSWORD}@db:5432/koude
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  database:
+  uploads:

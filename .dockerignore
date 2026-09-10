@@ -1,0 +1,14 @@
+node_modules
+.next
+.vinext
+.git
+.env
+.env.*
+dist
+.wrangler
+.sites-runtime
+coverage
+uploads
+*.tsbuildinfo
+
+.next-node
